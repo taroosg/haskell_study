@@ -57,15 +57,44 @@ data CollectibleToy = CollectibleToy {
   toyPrice :: Double
 }
 
+data Pamphlet = Pamphlet {
+  pamphletTitle :: String,
+  pamphletDescription :: String,
+  contact :: String
+}
+
 data StoreItem = BookItem Book
   | RecordItem VinyRecord
   | ToyItem CollectibleToy
+  | PamphletItem  Pamphlet
 
 -- それぞれの価格を表す関数をパターンマッチングで実装
+-- パンフレットは無料
 price :: StoreItem ->  Double
 price (BookItem book) = bookPrice book
 price (RecordItem record) = recordPrice record
 price (ToyItem toy) = toyPrice toy
+price (PamphletItem _) = 0.0
+
+type Radius = Double
+type Height = Double
+type Width = Double
+
+data Shape = Circle Radius
+  | Square Height
+  | Rectangle Height Width deriving Show
+
+perimeter :: Shape -> Double
+perimeter (Circle r) = 2*pi*r
+perimeter (Square h) = 4*h
+perimeter (Rectangle h w) = 2*h + 2*w
+
+area :: Shape -> Double
+area (Circle r) = pi*r^2
+area (Square h) = h^2
+area (Rectangle h w) = h*w
+
+
 
 main = do
   print("hoge")
