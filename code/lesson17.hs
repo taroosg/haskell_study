@@ -17,11 +17,104 @@ myAll testFunc = (foldr (&&) True) . (map testFunc)
 myAny :: (a -> Bool) -> [a] -> Bool
 myAny testFunc = (foldl (||) False) . (map testFunc)
 
+-- Semigroupでは常に同じ型を返す必要がある
+-- なので除算はできない
+instance Semigroup Integer where
+  (<>) x y = x + y  -- <>という演算子を+として定義している
+
+data Color = Red | Yellow | Blue | Green | Purple | Orange | Brown deriving (Show ,Eq)
+instance Semigroup Color where
+  -- Red <> Blueと記述するとPurpleを返す
+  (<>) Red Blue = Purple
+  (<>) Blue Red = Purple
+  (<>) Yellow Blue = Green
+  (<>) Blue Yellow = Green
+  (<>) Yellow Red = Orange
+  (<>) Red Yellow = Orange
+  -- ↓aとbを入力してa==bのときはaを返す，の意味
+  (<>) a b | a == b = a
+            -- 全部の入力値がRed, Blue, Purpleのどれかだったとき，の意味
+           | all (`elem` [Red, Blue, Purple]) [a, b] = Purple
+           | all (`elem` [Blue, Yellow, Green]) [a, b] = Green
+           | all (`elem` [Red, Yellow, Orange]) [a, b] = Orange
+           | otherwise = Brown
+
+  -- monoidは入力と出力が同じでないといけない
+  -- 出力が文字列になるのでNG
+  -- mconcat ['a','b','c','d','e']
+
+type Events = [String]
+type Probs = [Double]
+
+data PTable = PTable Events Probs
+
+createPTable :: Events -> Probs -> PTable
+createPTable events probs = PTable events normalizedProbs
+  where totalProbs = sum probs
+        normalizedProbs = map (\x -> x/totalProbs) probs
+
+-- eventとprobsをいい感じの形（[event | prob \n]）に整形する
+showPair :: String -> Double -> String
+showPair event prob = mconcat [event, "|", show prob, "\n"]
+
+-- eventのリストと確率のリストをzipWithして全部つなげて（mconcat）表示
+instance Show PTable where
+  show (PTable events probs) = mconcat pairs
+    where pairs = zipWith showPair events probs
+
+-- createPTable ["heads","tails"] [0.5,0.5]するとheads|0.5 \n tails|0.5が返る
+
+cartCombine :: (a -> b -> c) -> [a] -> [b] -> [c]
+cartCombine func l1 l2 = zipWith func newL1 cycledL2
+  where nToAdd = length l2
+        -- [0.5, 0.5]を[[0.5, 0.5, 0.5], [0.5, 0.5, 0.5]]みたいな感じにする
+        repeatedL1 = map (take nToAdd . repeat) l1
+        -- [[0.5, 0.5, 0.5], [0.5, 0.5, 0.5]]を[0.5, 0.5, 0.5, 0.5, 0.5, 0.5]みたいにする
+        newL1 = mconcat repeatedL1
+        -- newL1が何桁でもいいようにl2を無限長にしておく
+        cycledL2 = cycle l2
+
+-- 2つのイベントをいい感じにくっつける関数（heads-tailsの形）
+combineEvents :: Events -> Events -> Events
+combineEvents e1 e2 = cartCombine combiner e1 e2
+  where combiner = (\x y -> mconcat [x, "-", y])
+
+-- 2つの確率をいい感じにくっつける関数（cartCombineのfuncに入れるといい感じになる）
+combineProbs :: Probs -> Probs -> Probs
+combineProbs p1 p2 = cartCombine (*) p1 p2
+
+instance Semigroup PTable where
+  (<>) ptable1 (PTable [] []) = ptable1 -- PTableが空の場合
+  -- PTable型はStringのイベントとDoubleの確率から定義される
+  -- 2つの確率テーブルを<>で演算するといい感じに組み合わさったテーブルになって出力される
+  (<>) (PTable e1 p1) (PTable e2 p2) = createPTable newEvents newProbs
+    where newEvents = combineEvents e1 e2
+          newProbs = combineProbs p1 p2
+
+-- Monoidにmemptyとmappendを定義する
+-- mappendには上で設定した<>を使用する
+-- Monoidはmempty（単位元：加算なら0，乗算なら1など）とmappend（やりたい演算）を定義すれば良い
+instance Monoid PTable where
+  mempty = PTable [] []
+  mappend = (<>)
+
+-- コインの確率テーブルを定義
+-- createPTable関数にイベントのリストと確率のリストを入力
+coin :: PTable
+coin = createPTable ["heads", "tails"] [0.5, 0.5]
+
+-- スピナーの確率テーブルを定義
+spinner :: PTable
+spinner = createPTable ["red", "blue", "green"] [0.1, 0.2, 0.7]
+
+-- 下記のようにするとcoinとspinnerを組み合わせた確率テーブルができる
+-- coin <> spinner
+
+-- 下記のようにするとcoinを3回投げたときの確率テーブルができる
+-- mconcat [coin, coin, coin]
+
 main = do
-  print(myAll even [1,2,3])
-
-
-
+  print(mconcat [spinner, spinner, spinner])
 
 -- import Data.List
 
