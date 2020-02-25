@@ -5,6 +5,9 @@ import qualified Data.Map as Map
 
 data Box a = Box a deriving Show
 
+boxMap :: (a -> b) -> Box a -> Box b
+boxMap func (Box val) = Box (func val)
+
 n = 6 :: Int
 
 word = "box"
@@ -18,6 +21,9 @@ unwrap (Box x) = x
 
 -- タプルは型が異なっていても良いが，下記では同じ型でないといけないように定義している
 data Triple a = Triple a a a deriving Show
+
+tripleMap :: (a -> b) -> Triple a -> Triple b
+tripleMap func (Triple v1 v2 v3) = Triple (func v1) (func v2) (func v3)
 
 -- 例1
 -- Triple Double Double Doubleの型
@@ -101,7 +107,7 @@ itemInventory = [itemCount1, itemCount2, itemCount3]
 
 
 -- 臓器の型定義
-data Organ = Heart | Brain | Kidney | Spleen deriving (Show, Eq)
+data Organ = Heart | Brain | Kidney | Spleen deriving (Show, Eq, Ord, Enum)
 
 organs :: [Organ]
 organs = [Heart, Heart, Brain, Spleen, Spleen, Kidney]
@@ -119,6 +125,21 @@ organPairs = zip ids organs
 -- カタログをつくる
 organCatalog :: Map.Map Int Organ
 organCatalog = Map.fromList organPairs
+
+values :: [Organ]
+values = map snd (Map.toList organCatalog)
+
+-- 全てのパーツから成るリストを定義
+allOrgans :: [Organ]
+allOrgans = [Heart .. Spleen]
+
+-- パーツの数を数える
+organCounts :: [Int]
+organCounts = map countOrgan allOrgans
+  where countOrgan = (\organ -> (length . filter (==organ)) values)
+
+organInventry :: Map.Map Organ Int
+organInventry = Map.fromList (zip allOrgans organCounts)
 
 main = do
   print (Map.lookup 7 organCatalog)
