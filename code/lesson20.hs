@@ -90,7 +90,35 @@ ts3 = fileToTS file3
 ts4 :: TS Double
 ts4 = fileToTS file4
 
+-- キーバリューを(k, Maybe v)に変換
+insertMaybePair :: Ord k => Map.Map k v -> (k, Maybe v) -> Map.Map k v
+insertMaybePair myMap (_, Nothing) = myMap
+insertMaybePair myMap (key, (Just value)) = Map.insert key value myMap
 
+combineTS :: TS a -> TS a -> TS a
+combineTS (TS [] []) ts2 = ts2
+combineTS ts1 (TS [] []) = ts1
+combineTS (TS t1 v1) (TS t2 v2) = TS completeTimes combinedValues
+-- 時間をすべて組み合わせる
+  where bothTimes = mconcat [t1, t2]
+        completeTimes = [(minimum t1) .. (maximum t2)]
+        -- ts1の値を空のMapに挿入する
+        tvMap = foldl insertMaybePair Map.empty (zip t1 v1)
+        -- ts2の値を上の業で作成したMapに挿入する．自動的に重複する値が上書きされる
+        updatedMap = foldl insertMaybePair tvMap (zip t2 v2)
+        -- updatedMapにlookupを適用するとMaybe型のリストが得られる
+        combinedValues = map (\v -> Map.lookup v updatedMap) completeTimes
+
+instance Semigroup (TS a) where
+  (<>) = combineTS
+
+-- mconcat :: Monoid a => [a] -> a
+instance Monoid (TS a) where
+  mempty = TS [] []
+  mappend = (<>)
+
+tsAll :: TS Double
+tsAll = mconcat [ts1, ts2, ts3, ts4]
 
 main = do
-  print (ts4)
+  print (tsAll)
