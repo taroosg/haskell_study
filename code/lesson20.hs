@@ -146,7 +146,7 @@ type CompareFunc a = (a -> a -> a)
 -- TS型を比較する関数の型定義
 type TSCompareFunc a = ((Int, Maybe a) -> (Int, Maybe a) -> (Int, Maybe a))
 
--- 比較関数を入力すると入力した関数で比較した結果を返す関数
+-- 比較関数を入力するとTS型に使える関数を返す関数
 -- makeTSCompare min (3, Just 100) (4, Just 10)のように使える
 makeTSCompare :: Eq a => CompareFunc a -> TSCompareFunc a
 makeTSCompare func = newFunc
@@ -162,7 +162,7 @@ makeTSCompare func = newFunc
           then (i1, Just val1)
           else (i2, Just val2)
 
--- TS型データに比較関数を適用する関数
+-- TS型データのリストに比較関数を適用する関数
 -- 比較関数とTSデータを入力すると比較関数に引っかかったタプルを返す
 compareTS :: Eq a => (a -> a -> a) -> TS a -> Maybe (Int, Maybe a)
 compareTS func (TS [] []) = Nothing
@@ -181,5 +181,62 @@ minTS = compareTS min
 maxTS :: Ord a => TS a -> Maybe (Int, Maybe a)
 maxTS = compareTS max
 
+-- リストの差分を計算する処理
+-- Maybe a型を受け取り，減算する関数
+diffPair :: Num a => Maybe a -> Maybe a -> Maybe a
+-- 片方がNothingの場合は何も返さない
+diffPair Nothing _ = Nothing
+diffPair _ Nothing = Nothing
+-- 両方に値が存在するときは減算した結果を返す
+diffPair (Just x) (Just y) = Just (x - y)
+
+-- TS型を入力すると階差数列的なリストを返す関数
+diffTS :: Num a => TS a -> TS a
+diffTS (TS [] []) = TS [] []
+diffTS (TS times values) = TS times (Nothing:diffValues)
+  -- 最初の要素を取り除いたリスト
+  where shiftValues = tail values
+        -- diffPair関数を用いて，1番目と0番目の差分，2番目と1番目の差分，．．．のように求める
+        diffValues = zipWith diffPair shiftValues values
+
+-- 平滑化のために移動平均を算出する処理
+-- 最終的に作りたい，データとn項を入力すると解析結果のリストを出力する型シグネチャ
+-- maTS :: (Real a) => TS a -> Int -> TS Double
+
+-- Maybe aのリストの平均を求める関数
+-- この関数でn項の加算平均を算出する
+meanMaybe :: (Real a) => [Maybe a] -> Maybe Double
+meanMaybe vals = if any (==Nothing) vals
+  then Nothing
+  else (Just avg)
+    -- fromJustは(\(Just x) -> x)と同義
+    where avg = mean (map fromJust vals)
+
+-- データとnを入力して移動平均を計算する関数
+movingAvg :: (Real a) => [Maybe a] -> Int -> [Maybe Double]
+movingAvg [] n = []
+movingAvg vals n = if length nextVals == n
+  -- 最初からn個抽出して加算平均
+  -- 残ったリストに対して再帰処理
+  then (meanMaybe nextVals):(movingAvg restVals n)
+  -- 最後まで処理が終わったら空のリストを返す
+  else []
+    -- nextValsは最初からn個抽出したリスト
+    -- restValsは最初を除いたリスト
+    where nextVals = take n vals
+          restVals = tail vals
+
+-- TSの移動平均を求めて中心化する関数
+maTS :: (Real a) => TS a -> Int -> TS Double
+maTS (TS [] []) n = TS [] []
+maTS (TS times values) n = TS times smoothedValues
+  -- valuesに移動平均計算処理を適用
+  where ma = movingAvg values n
+        -- 両端に追加するためのNothingのリスト
+        nothing = take (n `div` 2) (repeat Nothing)
+        -- 両端にNothingを追加した結果用のリスト
+        smoothedValues = mconcat [nothing, ma, nothing]
+
+
 main = do
-  print (maxTS tsAll)
+  print (maTS tsAll 3)
